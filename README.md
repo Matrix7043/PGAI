@@ -1,9 +1,3 @@
-Perfect 👍 I’ll rewrite your **README.md** so it’s clean, modern, and only uses `uv` with `pyproject.toml`.
-
-Here’s the updated version:
-
----
-
 # pgai - Post Generator Agent
 
 `pgai` is a FastAPI-based image generation service that creates social media posts by overlaying text onto a base image. It's designed to automate the creation of simple, text-based visual content.
