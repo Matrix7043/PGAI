@@ -1,11 +1,14 @@
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import cv2
-from typing import Dict, Any, Tuple, Optional
+import dotenv
+import os
+from typing import Tuple, Optional
 from typing_extensions import TypedDict
 from pathlib import Path
-import os
 from langgraph.graph import StateGraph, END
+
+dotenv.load_dotenv()
 
 
 class WorkflowState(TypedDict):
@@ -124,19 +127,23 @@ def create_workflow():
 
 
 # Example usage
-def run_workflow():
+def run_workflow(content, reference, title):
     """Run the image processing workflow"""
     # Create initial state
+    IMGPATH = os.getenv("IMGPATH", "./base.png")
+    FONTPATH = os.getenv("FONTPATH", "./JetBrainsMonoNerdFontMono-BoldItalic.ttf")
+    OUTPUTPATH = os.getenv("OUTPUTPATH", "./output/processed_image.png")
+
     initial_state: WorkflowState = {
-        "image_path": "./base.png",
-        "font_path": "./JetBrainsMono/JetBrainsMonoNerdFont-Italic.ttf",
-        "content": 'The First Computer Bug: The term "bug" in computer science originated from a real insect, a moth, found causing issues in a computer in 1947',
-        "reference": "https://medium.com/",
-        "title": "\ueb80 Tech Facts",
+        "image_path": IMGPATH,
+        "font_path": FONTPATH,
+        "content": content,
+        "reference": reference,
+        "title": title,
         "title_box": (150, 250, 750, 200),
         "content_box": (150, 510, 750, 470),
         "reference_box": (125, 1175, 775, 55),
-        "output_path": "./output/processed_image.png",
+        "output_path": OUTPUTPATH,
         "processed_image": None,
     }
 
@@ -145,9 +152,3 @@ def run_workflow():
     result = app.invoke(initial_state)
 
     return result
-
-
-if __name__ == "__main__":
-    result = run_workflow()
-    print("Workflow completed successfully!")
-    print(f"Final state keys: {result.keys()}")
