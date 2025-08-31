@@ -130,8 +130,10 @@ def create_workflow():
 def run_workflow(content, reference, title):
     """Run the image processing workflow"""
     # Create initial state
-    IMGPATH = os.getenv("IMGPATH", "./base.png")
-    FONTPATH = os.getenv("FONTPATH", "./JetBrainsMonoNerdFontMono-BoldItalic.ttf")
+    IMGPATH = os.getenv("IMGPATH", "./assets/base.png")
+    FONTPATH = os.getenv(
+        "FONTPATH", "./assets/JetBrainsMonoNerdFontMono-BoldItalic.ttf"
+    )
     OUTPUTPATH = os.getenv("OUTPUTPATH", "./output/processed_image.png")
 
     initial_state: WorkflowState = {
