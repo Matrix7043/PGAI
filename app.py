@@ -35,12 +35,13 @@ def main():
     print("[3/3] Summarizing (parallel)…")
     summaries = summarize_long_parallel(
         articles,
-        max_chars=1600,
+        max_chars=None,           # pass full text; we only constrain the OUTPUT to <= 150
         workers=4,
         timeout_per_item=12,
         time_budget_seconds=None,
         verbose=True,
     )
+
     print(f"    Summaries written: {len(summaries)}")
 
     out_path = f"summaries_{int(time.time())}.json"

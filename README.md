@@ -1,98 +1,223 @@
 # News Agent Nexus
 
+
+A CLI tool to automatically search, crawl, and summarize news and articles on any given topic, creating a concise brief from multiple sources.
+
+***
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Quickstart](#quickstart)
+- [Usage](#usage)
+- [Output Example](#output-example)
+- [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
+- [Limitations](#limitations)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Overview
 
-News Agent Nexus is a command-line tool that automates the process of finding, crawling, and summarizing news articles on a given topic. It uses Google Custom Search to find relevant articles, crawls the websites to extract their content, and then uses a large language model to generate concise summaries.
+News Agent Nexus is a Python-based command-line tool that acts as an autonomous research agent. You provide a topic, and it performs a web search to find relevant seed articles, crawls those pages and linked articles, and uses a large language model to generate structured summaries. The final output is a JSON file containing a list of concise, easy-to-read summaries with source references.
 
 ## Features
 
-- **Topic-based News Aggregation**: Provide any topic, and the agent will find the latest news.
-- **Web Crawling**: Extracts the main content from news articles, filtering out boilerplate.
-- **AI-Powered Summarization**: Uses a Large Language Model to generate high-quality summaries.
-- **Configurable**: Easily customize parameters like the number of articles to process, crawl depth, and more.
-- **Efficient and Robust**: Built with parallel processing, timeouts, and error handling to ensure it runs smoothly.
-- **Extensible**: The agent is built with `langgraph`, making it easy to modify the workflow.
+- **Topic-based Search**: Initiates research from a simple user-provided topic.
+- **Web Crawling**: Fetches content from seed URLs and discovers related articles.
+- **AI-Powered Summarization**: Uses Google's Gemini models to generate structured, concise summaries.
+- **Parallel Processing**: Summarizes multiple articles concurrently for faster results.
+- **Structured Output**: Saves results in a clean, timestamped JSON file for easy use in other applications.
+- **Configurable**: API keys and search engine details are managed via environment variables.
 
-## How It Works
+## Architecture
 
-The agent operates in a three-step process, orchestrated by a state graph:
+The agent operates in a three-stage pipeline orchestrated by `app.py`:
 
-1.  **Search**: The agent starts by searching Google for news articles based on the user-provided topic. It filters out irrelevant domains to ensure the quality of the sources.
+1.  **Search**: The user's topic is fed to the `tools_search` module, which uses the Google Custom Search API to find a list of initial "seed" URLs.
+2.  **Crawl**: The `tools_crawl` module fetches the HTML content for each seed URL. It also identifies and crawls other promising article-like links on those pages to broaden the content base.
+3.  **Summarize**: The extracted text from the crawled pages is passed to the `tools_summarize` module. This module uses a large language model (Gemini) to generate a short, structured summary for each article in parallel.
 
-2.  **Crawl**: Next, it crawls the top search results to extract the full text of each article. The crawler is optimized for speed and can be configured to limit the number of pages and crawl depth.
+The final summaries are collected and written to a single JSON file.
 
-3.  **Summarize**: In the final step, the agent summarizes the crawled content. It uses a parallelized approach to generate summaries quickly and respects a global time budget to ensure it completes in a timely manner.
+```mermaid
+graph TD
+    A[User Topic] --> B{app.py};
+    B --> C[1. Search Seeds<br>(tools_search.py)];
+    C -- Google CSE API --> D[Seed URLs];
+    D --> E[2. Crawl Pages<br>(tools_crawl.py)];
+    E -- HTTP Requests --> F[Page Content];
+    F --> G[3. Summarize Articles<br>(tools_summarize.py)];
+    G -- Gemini API --> H[Structured Summaries];
+    H --> I{output.json};
+```
 
-The final summaries are saved to a JSON file in the project's root directory.
+## Prerequisites
 
-## Getting Started
+- Python 3.8+
+- Access to Google Cloud Platform for:
+    - Google Custom Search API
+    - Google AI (Gemini) API
 
-### Prerequisites
+## Installation
 
-- Python 3.7+
-- An environment file with your Google API credentials.
+Follow these steps to set up the project locally.
 
-### Installation
+**1. Clone the repository:**
 
-1.  **Clone the repository:**
+```bash
+git clone <YOUR_REPOSITORY_URL>
+cd News-Agent-Nexus
+```
+
+**2. Create and activate a Python virtual environment:**
+
+- **macOS / Linux (bash)**
+  ```bash
+  python3 -m venv .venv
+  source .venv/bin/activate
+  ```
+
+- **Windows (Command Prompt)**
+  ```powershell
+  python -m venv .venv
+  .venv\Scripts\activate.bat
+  ```
+
+- **Windows (PowerShell)**
+  ```powershell
+  python -m venv .venv
+  .venv\Scripts\Activate.ps1
+  ```
+
+**3. Install the required dependencies:**
+
+```bash
+pip install -r requirements.txt
+```
+
+## Configuration
+
+The tool requires three environment variables for Google's APIs. Create a file named `.env` in the root of the project directory and add the following, replacing the placeholder values with your actual credentials.
+
+```env
+# .env
+
+# For AI-powered summarization via Google AI Studio or GCP
+GOOGLE_API_KEY="AIzaSy..."
+
+# For the initial web search via Google Custom Search Engine API
+GOOGLE_CSE_KEY="AIzaSy..."
+GOOGLE_CSE_CX="your_custom_search_engine_id"
+```
+
+| Variable          | Purpose                                                                                             | Example Value              |
+| ----------------- | --------------------------------------------------------------------------------------------------- | -------------------------- |
+| `GOOGLE_API_KEY`  | API key for the Google Gemini model used in summarization.                                          | `AIzaSy...`                |
+| `GOOGLE_CSE_KEY`  | API key for the Google Custom Search Engine API.                                                    | `AIzaSy...`                |
+| `GOOGLE_CSE_CX`   | The unique ID for your Programmable Search Engine instance.                                         | `a1b2c3d4e5f67890`         |
+
+The `.env` file is ignored by Git, so your keys will not be committed.
+
+## Quickstart
+
+Once you have completed the installation and configuration steps, you can run the agent immediately.
+
+1.  **Activate your virtual environment** (if you haven't already).
+2.  **Run the application:**
+
     ```bash
-    git clone https://github.com/your-username/news-agent-nexus.git
-    cd news-agent-nexus
+    python app.py
     ```
 
-2.  **Create a virtual environment and install dependencies:**
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate  # On Windows, use `.venv\Scripts\activate`
-    pip install -r requirements.txt
-    ```
-    *(Note: A `requirements.txt` file is not yet present. You can create one by running `pip freeze > requirements.txt`)*
+3.  **Enter a topic** when prompted:
 
-3.  **Set up your environment variables:**
-
-    Create a file named `.env` in the root of the project and add the following, replacing `...` with your actual credentials:
     ```
-    GOOGLE_API_KEY=...
-    GOOGLE_CSE_ID=...
-    GOOGLE_CSE_KEY=...
+    Enter your topic (e.g. 'latest AI safety blog posts'): developments in solid-state batteries
     ```
 
-### Usage
+The script will then execute all stages and save the results to a `summaries_{timestamp}.json` file.
 
-To run the agent, simply execute the `app.py` script:
+## Usage
+
+To run the agent, simply execute the main application script.
 
 ```bash
 python app.py
 ```
 
-You will be prompted to enter a topic. For example:
+The application will prompt you to enter a topic. After you provide the topic and press Enter, it will begin the search, crawl, and summarization process, printing its progress to the console.
 
 ```
-Enter your topic (e.g. 'latest AI safety blog posts'):
+Enter your topic (e.g. 'latest AI safety blog posts'): latest news on quantum computing hardware
+[1/3] Searching…
+    Using 8 seed URLs.
+[2/3] Crawling (seed + top links)…
+    Unique pages: 21
+[3/3] Summarizing (parallel)…
+    Summaries written: 5
+
+Wrote summaries_1756808756.json with 5 summaries.
+
+Timing breakdown (seconds):
+  search     1.12
+  crawl      8.45
+  summarize  15.20
+  TOTAL      24.77
 ```
 
-The agent will then start the process, and you'll see log messages for each stage. Once complete, a `summaries_{timestamp}.json` file will be created with the results.
+## Output Example
 
-## Configuration
+The output is a JSON array of summary objects, saved to a file like `summaries_1756808756.json`. Each object contains a title, the summarized content, and a reference URL.
 
-You can adjust the agent's behavior by modifying the constants at the top of the `app.py` file. These include:
-
-- `SEEDS`: The number of seed URLs to start with.
-- `PAGES_PER_SEED`: The number of pages to crawl per seed URL.
-- `CRAWL_DEPTH`: The maximum depth for the crawler.
-- `SUMMARIES_MAX`: The maximum number of summaries to generate.
-- `GLOBAL_BUDGET`: The maximum time in seconds the agent is allowed to run.
-
-## Dependencies
-
-This project relies on the following major Python libraries:
-
-- `langgraph`: To create and manage the agent's workflow.
-- `beautifulsoup4` and `trafilatura`: For web crawling and content extraction.
-- `google-api-python-client`: For interacting with the Google Search API.
-- `python-dotenv`: For managing environment variables.
-
-To generate a full list of dependencies, you can run:
-```bash
-pip freeze > requirements.txt
+```json
+[
+  {
+    "title": "Quantum Leap",
+    "content": "Researchers at XYZ University have developed a new qubit stabilization technique, potentially extending coherence times by over 200%.",
+    "reference": "https://example.com/news/quant"
+  },
+  {
+    "title": "Scaling Up",
+    "content": "A major tech firm announced a 1,000-qubit processor, a significant milestone in building fault-tolerant quantum computers. Details remain sparse.",
+    "reference": "https://tech-journal.com/artic"
+  }
+]
 ```
+
+## Troubleshooting
+
+- **`RuntimeError: Google Custom Search credentials missing...`**: This error means the `GOOGLE_CSE_KEY` or `GOOGLE_CSE_CX` environment variables are not set. Ensure your `.env` file is correct and in the project root.
+- **`RuntimeError: GOOGLE_API_KEY is missing...`**: This error means the `GOOGLE_API_KEY` for the Gemini model is not set. Check your `.env` file.
+- **Slow Performance**: The crawling and summarization steps depend on network speed and API response times. The script runs summarization in parallel to mitigate this, but it can still take time.
+- **No Summaries Generated**: This can happen if the initial search yields no results, the web pages cannot be crawled, or the content is too sparse to summarize. Check the console output for errors.
+
+## FAQ
+
+**Q: Can I use a different search engine or language model?**
+**A:** Currently, the tool is hardcoded to use Google Custom Search and Google Gemini. Replacing these would require modifying `tools_search.py` and `tools_summarize.py` respectively.
+
+**Q: How many articles does it summarize?**
+**A:** The script is currently configured to summarize the top 5 most article-like pages it finds to keep the process quick and focused. This can be changed in `app.py`.
+
+**Q: Why are the summaries so short?**
+**A:** The summary length (title, content) is constrained in the prompt sent to the language model to produce very brief, tweet-sized outputs. You can adjust the `max_length` constraints in the `ArticleSummary` Pydantic model in `tools_summarize.py`.
+
+## Limitations
+
+- **API Costs**: This tool makes calls to paid Google Cloud APIs. Be mindful of the potential costs, especially if running it frequently or on many topics.
+- **Crawl Quality**: The web crawler uses simple heuristics to find articles and may miss content or fail on sites with heavy JavaScript.
+- **Summarization Accuracy**: Summaries are generated by an AI and may contain inaccuracies or misinterpret the source material. Always consult the reference link for critical information.
+
+## Contributing
+
+TODO: Please add contribution guidelines, such as how to submit pull requests, coding standards, and testing procedures.
+
+## License
+
+TODO: A license has not yet been specified for this project. Please choose an open-source license and add a `LICENSE` file.
