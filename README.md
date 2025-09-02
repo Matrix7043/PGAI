@@ -209,7 +209,7 @@ The `ai_engine` and `server` modules are designed to work together. The output o
 
 2.  **Run the `server`**:
     ```bash
-    uvicorn server.main:app --reload
+    uv run uvicorn server.main:app --reload
     ```
 
 3.  **Send a POST request to the server**:
