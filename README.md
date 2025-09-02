@@ -155,7 +155,7 @@ The script will then execute all stages and save the results to a `summaries_{ti
 To run the agent, simply execute the main application script.
 
 ```bash
-python app.py
+uv run python app.py
 ```
 
 The application will prompt you to enter a topic. After you provide the topic and press Enter, it will begin the search, crawl, and summarization process, printing its progress to the console.
