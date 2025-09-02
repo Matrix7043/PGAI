@@ -1,140 +1,108 @@
-import warnings, time, re, urllib.parse, httpx, threading
-from bs4 import XMLParsedAsHTMLWarning, BeautifulSoup
-from urllib import robotparser
-from typing import List, Dict, Set, Tuple, Optional
-from trafilatura import extract
+import re, urllib.parse, requests
+from typing import List, Dict, Optional
+from bs4 import BeautifulSoup
 
-warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-
-UA = "LangGraphArticleBot/0.1 (+https://example.com/; contact: you@example.com)"
-
-def _domain(url: str) -> str:
-    try:
-        return urllib.parse.urlparse(url).netloc.lower()
-    except Exception:
-        return ""
-
-def same_domain(url: str, root: str) -> bool:
-    a = urllib.parse.urlparse(url).netloc
-    b = urllib.parse.urlparse(root).netloc
-    return a == b or a.endswith("." + b)
-
-def normalize_url(url: str, base: str) -> str:
-    return urllib.parse.urljoin(base, url.split("#")[0])
-
-def looks_like_article(url: str) -> bool:
-    return bool(re.search(r"/\d{4}/|/news/|/story|/article|/posts?/", url, re.I))
-
-def allowed_by_robots(url: str, rp: robotparser.RobotFileParser) -> bool:
-    try: return rp.can_fetch(UA, url)
-    except Exception: return True
-
-def _httpx_client() -> httpx.Client:
-    # Fast failures for slow TLS/DNS
-    return httpx.Client(
-        headers={"User-Agent": UA},
-        timeout=httpx.Timeout(connect=1.5, read=3.0, write=1.5, pool=1.5),
-        follow_redirects=True,
-        http2=False,
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124 Safari/537.36"
     )
+}
 
-def _fallback_text(html: str) -> str:
-    """Lightweight fallback extractor when boilerplate removal fails."""
+# Generic "this looks like a news/article URL" patterns
+YEAR_PATH = re.compile(r"/20\d{2}/\d{2}/\d{2}/")  # e.g., /2025/09/02/
+ARTICLE_SEGMENTS = (
+    "/news/", "/story/", "/stories/", "/article/", "/articles/",
+    "/sport/", "/sports/", "/cricket/", "/olympic", "/olympics/",
+    "/business/", "/tech/", "/technology/",
+)
+
+EXCLUDE_SEGMENTS = (
+    "/tag/", "/tags/", "/category/", "/topics/", "/about/", "/privacy", "/terms", "/contact",
+)
+
+def fetch(url: str) -> str:
+    r = requests.get(url, headers=HEADERS, timeout=12)
+    r.raise_for_status()
+    return r.text
+
+def _get_meta(soup: BeautifulSoup, prop: str, attr: str = "content") -> Optional[str]:
+    tag = soup.find("meta", attrs={"property": prop}) or soup.find("meta", attrs={"name": prop})
+    return tag.get(attr).strip() if tag and tag.get(attr) else None
+
+def extract_text_and_meta(html: str) -> Dict[str, str]:
+    soup = BeautifulSoup(html, "html.parser")
+    text = ""
+    for selector in [
+        "article",
+        "[itemprop='articleBody']",
+        ".article-content",
+        ".entry-content",
+        ".post-content",
+        ".story-content",
+        "#readability-page-1",
+        "#main", "#content", "#primary",
+        "main",
+    ]:
+        node = soup.select_one(selector)
+        if node and node.get_text(strip=True):
+            text = node.get_text(" ", strip=True)
+            break
+    if not text:
+        text = soup.get_text(" ", strip=True)
+
+    title = (_get_meta(soup, "og:title") or (soup.title.string if soup.title else "") or "").strip()
+    desc  = (_get_meta(soup, "og:description") or _get_meta(soup, "description") or "").strip()
+    canonical = None
+    link_canon = soup.find("link", rel=lambda v: v and "canonical" in v)
+    if link_canon and link_canon.get("href"):
+        canonical = link_canon["href"].strip()
+    return {"text": text, "title": title, "desc": desc, "canonical": canonical}
+
+def looks_like_article(href: str) -> bool:
+    if not href or href.startswith("#"):
+        return False
+    href_l = href.lower()
+    if any(seg in href_l for seg in EXCLUDE_SEGMENTS):
+        return False
+    return YEAR_PATH.search(href_l) is not None or any(seg in href_l for seg in ARTICLE_SEGMENTS)
+
+def crawl_seed_and_links(url: str, limit_links: int = 3) -> List[Dict]:
+    pages: List[Dict] = []
     try:
-        soup = BeautifulSoup(html, "lxml")
-        parts = []
-        title = soup.title.get_text(strip=True) if soup.title else ""
-        if title:
-            parts.append(title)
-        meta = soup.find("meta", attrs={"name": "description"})
-        if meta and meta.get("content"):
-            parts.append(meta["content"].strip())
-        for tag in soup.select("h1,h2,p"):
-            t = tag.get_text(" ", strip=True)
-            if t:
-                parts.append(t)
-            if sum(len(x) for x in parts) > 1600:
+        html = fetch(url)
+        meta = extract_text_and_meta(html)
+        pages.append({"url": url, **meta})
+        soup = BeautifulSoup(html, "html.parser")
+        links = []
+        for a in soup.find_all("a", href=True):
+            href = urllib.parse.urljoin(url, a["href"])
+            if looks_like_article(href) and href not in links:
+                links.append(href)
+            if len(links) >= limit_links:
                 break
-        return "\n".join(parts).strip()
-    except Exception:
-        return ""
-
-def crawl_site(
-    seed_url: str,
-    max_pages: int = 1,
-    max_depth: int = 0,
-    only_articles: bool = False,
-    total_deadline_sec: int = 5,
-    workers: int = 2,
-    stop_event: Optional[threading.Event] = None,
-    force_save_seed: bool = True,
-    verbose: bool = True,
-) -> List[Dict]:
-    """
-    Ultra-fast, seed-only by default. Always tries to save the seed page, even if the
-    primary extractor fails (uses fallback). Hard deadline per seed. Verbose logs.
-    """
-    if stop_event is None:
-        stop_event = threading.Event()
-
-    start = time.time()
-    if verbose:
-        print(f"      [crawl] seed={seed_url}", flush=True)
-
-    rp = robotparser.RobotFileParser()
-    try:
-        rp.set_url(urllib.parse.urljoin(seed_url, "/robots.txt"))
-        rp.read()
+        for link in links:
+            try:
+                sub_html = fetch(link)
+                sub_meta = extract_text_and_meta(sub_html)
+                canon = sub_meta.get("canonical")
+                final_url = canon if canon and canon.startswith("http") else link
+                pages.append({"url": final_url, **sub_meta})
+            except Exception:
+                pass
     except Exception:
         pass
+    return pages
 
-    seen: Set[str] = set()
-    queue: List[Tuple[str, int]] = [(seed_url, 0)]
-    results: List[Dict] = []
-
-    def timed_out() -> bool:
-        return (time.time() - start) >= total_deadline_sec
-
-    with _httpx_client() as client:
-        while queue and len(results) < max_pages:
-            if stop_event.is_set() or timed_out():
-                if verbose: print("      [crawl] stop/deadline", flush=True)
-                break
-
-            url, depth = queue.pop(0)
-            if url in seen: 
+def crawl_many(seeds: List[str], per_seed_links: int = 3) -> List[Dict]:
+    all_pages: List[Dict] = []
+    seen = set()
+    for s in seeds:
+        for p in crawl_seed_and_links(s, per_seed_links):
+            url = p.get("url")
+            if not url or url in seen:
                 continue
             seen.add(url)
-
-            if not allowed_by_robots(url, rp):
-                if verbose: print(f"      [crawl] robots disallow {url}", flush=True)
-                if not (force_save_seed and depth == 0):
-                    continue
-
-            if verbose: print(f"      [crawl] → GET {url}", flush=True)
-            try:
-                resp = client.get(url)
-                resp.raise_for_status()
-                html = resp.text
-            except Exception as e:
-                if verbose: print(f"      [crawl]   fetch fail: {e}", flush=True)
-                continue
-
-            text = extract(html, url=url) or _fallback_text(html)
-
-            if text:
-                if verbose: print(f"      [crawl]   +saved ({len(text)} chars)", flush=True)
-                results.append({"url": url, "text": text})
-            elif depth == 0 and force_save_seed:
-                minimal = _fallback_text(html) or ""
-                if minimal:
-                    if verbose: print(f"      [crawl]   +saved (fallback {len(minimal)} chars)", flush=True)
-                    results.append({"url": url, "text": minimal})
-                else:
-                    if verbose: print("      [crawl]   no text extracted", flush=True)
-            else:
-                if verbose: print("      [crawl]   no text extracted", flush=True)
-
-            time.sleep(0.02)
-
-    return results
+            all_pages.append(p)
+    return all_pages

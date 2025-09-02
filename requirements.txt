@@ -1,0 +1,8 @@
+python-dotenv
+langgraph
+httpx
+beautifulsoup4
+trafilatura
+lxml
+pydantic
+langchain-google-genai
