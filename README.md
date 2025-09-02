@@ -139,7 +139,7 @@ Once you have completed the installation and configuration steps, you can run th
 2.  **Run the application:**
 
     ```bash
-    python app.py
+    uv run python app.py
     ```
 
 3.  **Enter a topic** when prompted:
