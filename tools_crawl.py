@@ -106,7 +106,6 @@ def crawl_site(
                 continue
             seen.add(url)
 
-            # robots.txt: allow skipping only for seed if force_save_seed (we still try politely)
             if not allowed_by_robots(url, rp):
                 if verbose: print(f"      [crawl] robots disallow {url}", flush=True)
                 if not (force_save_seed and depth == 0):
@@ -121,17 +120,12 @@ def crawl_site(
                 if verbose: print(f"      [crawl]   fetch fail: {e}", flush=True)
                 continue
 
-            # Try main extractor, then fallback
             text = extract(html, url=url) or _fallback_text(html)
 
-            # Save logic:
-            # - If we extracted something, save it.
-            # - If seed and force_save_seed, save even a tiny snippet (title/meta only).
             if text:
                 if verbose: print(f"      [crawl]   +saved ({len(text)} chars)", flush=True)
                 results.append({"url": url, "text": text})
             elif depth == 0 and force_save_seed:
-                # attempt minimal fallback if nothing came out
                 minimal = _fallback_text(html) or ""
                 if minimal:
                     if verbose: print(f"      [crawl]   +saved (fallback {len(minimal)} chars)", flush=True)
@@ -141,9 +135,6 @@ def crawl_site(
             else:
                 if verbose: print("      [crawl]   no text extracted", flush=True)
 
-            # In ultra-fast mode we don't follow links (max_depth=0)
-
-            # Short pause for politeness
             time.sleep(0.02)
 
     return results

@@ -9,13 +9,12 @@ load_dotenv()
 from langgraph.graph import StateGraph, START, END
 from tools_search import search_google_cse
 from tools_crawl import crawl_site
-from tools_summarize import summarize_long_parallel  # parallel + timeout + cancel
+from tools_summarize import summarize_long_parallel  
 
-# === Ultra-fast, seed-only profile ===
 SEEDS = 2
-PAGES_PER_SEED = 1          # seed page only
-CRAWL_DEPTH = 0             # no link following
-CRAWL_DEADLINE_PER_SEED = 5 # 5s per seed, hard cap
+PAGES_PER_SEED = 1       
+CRAWL_DEPTH = 0            
+CRAWL_DEADLINE_PER_SEED = 5 
 CRAWL_WORKERS = 2
 
 SUMMARIES_MAX = 2
@@ -24,7 +23,6 @@ SUMMARIZE_WORKERS = 2
 LLM_TIMEOUT_PER_SUMMARY = 6
 GLOBAL_BUDGET = 22
 
-# common blockers (skip to avoid empty pages)
 BLOCKED_DOMAINS = {
     "www.imdb.com", "imdb.com",
     "www.reuters.com", "reuters.com",
@@ -32,7 +30,6 @@ BLOCKED_DOMAINS = {
     "www.bloomberg.com", "bloomberg.com",
 }
 
-# cancellation + timing
 stop_event = threading.Event()
 _tmarks: Dict[str, float] = {}
 _spans: Dict[str, float] = defaultdict(float)
@@ -77,7 +74,6 @@ def node_search(state: State) -> State:
     t_start("search")
     print("[1/3] Searching…", flush=True)
     seeds_all = search_google_cse(state["query"], top_k=max(SEEDS * 3, 2))
-    # filter out blocked domains, keep first SEEDS usable
     seeds = []
     for item in seeds_all:
         if _domain(item["url"]) in BLOCKED_DOMAINS:
@@ -103,19 +99,18 @@ def node_crawl(state: State) -> State:
                 seed["url"],
                 max_pages=PAGES_PER_SEED,
                 max_depth=CRAWL_DEPTH,
-                only_articles=False,            # seed is always kept
+                only_articles=False,            
                 total_deadline_sec=CRAWL_DEADLINE_PER_SEED,
                 workers=CRAWL_WORKERS,
                 stop_event=stop_event,
-                force_save_seed=True,           # <-- guarantee seed is saved
-                verbose=True,                   # <-- show GET/save logs
+                force_save_seed=True,           
+                verbose=True,                  
             )
             print(f"    {seed['url']} → {len(batch)} page(s)", flush=True)
             pages.extend(batch)
         except Exception as e:
             print(f"    Skipped {seed['url']} ({e})", flush=True)
 
-    # de-dup by URL
     seen, uniq = set(), []
     for p in pages:
         if p["url"] not in seen:
@@ -152,7 +147,6 @@ def node_summarize(state: State) -> State:
     t_end("summarize")
     return {"outputs": outs}
 
-# wire the graph
 builder = StateGraph(State)
 builder.add_node("search", node_search)
 builder.add_node("crawl", node_crawl)
