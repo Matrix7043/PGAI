@@ -1,6 +1,6 @@
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
-from workflow import run_workflow
+from .workflow import run_workflow
 
 app = FastAPI()
 
