@@ -203,7 +203,7 @@ The `ai_engine` and `server` modules are designed to work together. The output o
 
 1.  **Run the `ai_engine`**:
     ```bash
-    python ai_engine/app.py
+    uv run python ai_engine/app.py
     ```
     This will generate a `summaries_{timestamp}.json` file in the root directory.
 
