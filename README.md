@@ -1,173 +1,143 @@
-Nexus News Agent is an AI-powered project that provides search, crawling, and summarization tools, with both a lightweight prototype implementation and a more structured, production-ready architecture.
-It allows users to fetch data from the web, process it through AI-powered pipelines, and serve results via command-line tools or a server interface.
+# Nexus News Agent
+
+Nexus News Agent is an AI-powered project that provides a suite of tools for searching, crawling, and summarizing news articles from the web. It features a powerful AI engine to process text and a server component to generate images with the summarized content.
 
-🚀 Overview
+## Features
+
+- **Search**: Find news articles on any topic using Google Custom Search.
+- **Crawl**: Fetch and parse the content of articles from their URLs.
+- **Summarize**: Generate concise, one-line summaries of articles using the Gemini API.
+- **Image Generation**: Create images with the title, summary, and source of an article overlaid on a template.
+- **Modular Architecture**: The project is divided into an `ai_engine` for core processing and a `server` for API and image generation.
+
+## Project Structure
+
+```
+PGAI/
+├── .gitignore
+├── .python-version
+├── pyproject.toml
+├── README.md
+├── requirements.txt
+├── uv.lock
+├── ai_engine/
+│   ├── app.py              # Main entry point for the AI engine
+│   ├── tools_crawl.py      # Web crawling utilities
+│   ├── tools_search.py     # Search utilities
+│   └── tools_summarize.py  # Summarization logic
+└── server/
+    ├── main.py             # FastAPI server
+    ├── workflow.py         # Image generation workflow
+    ├── assets/
+    │   ├── base.png
+    │   ├── glyphnames.json
+    │   └── JetBrainsMonoNerdFontMono-BoldItalic.ttf
+    └── output/
+        └── processed_image.png
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.11 or higher
+- An environment manager like `venv` or `uv`.
 
-There are two major versions of this project:
+### Installation
 
-Prototype (PGAI-Naman)
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd PGAI
+    ```
 
-Flat structure
+2.  **Create and activate a virtual environment:**
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    ```
 
-Quick entry point for experimentation
+3.  **Install the dependencies:**
+    You can use either `pip` with `requirements.txt` or `uv` with `pyproject.toml`.
 
-Simple requirements.txt-based setup
+    *   **Using `pip`:**
+        ```bash
+        pip install -r requirements.txt
+        ```
 
-Development (PGAI-development)
+    *   **Using `uv`:**
+        ```bash
+        uv sync
+        ```
 
-Modularized structure with ai_engine and server components
+### Configuration
 
-Uses modern Python packaging (pyproject.toml, uv.lock)
+The project requires API keys for Google Custom Search and the Gemini API.
 
-Includes assets, workflows, and server functionality for deployment
+1.  **Create a `.env` file** in the root of the `PGAI` directory.
+2.  **Add your API keys to the `.env` file:**
+    ```
+    GOOGLE_CSE_KEY="your_google_custom_search_engine_key"
+    GOOGLE_CSE_CX="your_google_custom_search_engine_cx"
+    GOOGLE_API_KEY="your_gemini_api_key"
+    ```
 
-This README consolidates both branches into a single professional documentation, highlighting the core tools and setup instructions.
+## Usage
 
-📂 Project Structure
-Prototype: PGAI-Naman
-PGAI-Naman/
-├── app.py                 # Main entry point (prototype)
-├── tools_crawl.py         # Web crawling utilities
-├── tools_search.py        # Search utilities
-├── tools_summarize.py     # Summarization logic
-├── requirements.txt       # Dependencies (basic)
-├── README.md              # Minimal project documentation
-└── .gitignore
+### AI Engine
 
-Development: PGAI-development
-PGAI-development/
-├── ai_engine/             # Core AI logic
-│   ├── app.py             # Main AI engine entry point
-│   ├── tools_crawl.py     # Crawling functionality
-│   ├── tools_search.py    # Search functionality
-│   └── tools_summarize.py # Summarization functionality
-│
-├── server/                # Server-side application
-│   ├── main.py            # API / Web server entry point
-│   ├── workflow.py        # Workflow orchestration
-│   ├── assets/            # Fonts, images, glyph metadata
-│   └── output/            # Sample generated outputs
-│
-├── requirements.txt       # Alternative dependency spec
-├── pyproject.toml         # Modern Python packaging config
-├── uv.lock                # Lock file for reproducibility
-├── .python-version        # Python version pinning
-├── README.md              # Documentation (branch-specific)
-└── .gitignore
+The AI engine is a command-line tool that takes a topic as input, searches for relevant articles, crawls them, and generates summaries.
 
-🛠️ Features
+1.  **Run the AI engine:**
+    ```bash
+    python -m ai_engine.app
+    ```
 
-Crawling → Extract data from web sources
+2.  **Enter a topic** when prompted.
 
-Search → Query and retrieve relevant information
+3.  The summaries will be saved in a JSON file in the root of the `PGAI` directory.
 
-Summarization → Condense text into concise summaries
+### Server
 
-Server Support (Development branch) → Run as a service with workflows & asset management
+The server is a FastAPI application that can generate an image with the summarized content of an article.
 
-Prototype Mode (Naman branch) → Lightweight testing with minimal setup
+1.  **Start the server:**
+    ```bash
+    uvicorn server.main:app --reload
+    ```
 
-⚙️ Setup & Installation
-1. Clone the repository
-git clone <repo-url>
-cd PGAI-development   # or cd PGAI-Naman
+2.  **Send a POST request** to the `/content` endpoint with the following JSON payload:
+    ```json
+    {
+      "title": "Your Title",
+      "content": "Your one-line summary.",
+      "reference": "your.source.com"
+    }
+    ```
 
-2. Environment setup
-Option A: Using requirements.txt (Prototype or Dev)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+3.  The generated image will be saved as `processed_image.png` in the `server/output` directory.
 
-Option B: Using pyproject.toml (Dev branch preferred)
+## Dependencies
 
-If you have uv or Poetry, install via:
+The main dependencies are listed in `pyproject.toml` and `requirements.txt`. They include:
 
-uv sync
-# or
-poetry install
+- **FastAPI**: For the web server.
+- **LangChain & LangGraph**: For building the AI workflow.
+- **Pillow & OpenCV**: For image manipulation.
+- **Beautiful Soup & Requests**: For web crawling.
+- **Pydantic**: For data validation.
 
-3. Python version
+## Contributing
 
-The development branch specifies a .python-version. Make sure your Python matches (e.g., pyenv can be used).
+Contributions are welcome! Please feel free to submit a pull request.
 
-▶️ Usage
-Prototype (Naman)
+1.  Fork the repository.
+2.  Create a new branch (`git checkout -b feature/your-feature`).
+3.  Make your changes.
+4.  Commit your changes (`git commit -m 'Add some feature'`).
+5.  Push to the branch (`git push origin feature/your-feature`).
+6.  Open a pull request.
 
-Run directly:
+## License
 
-python app.py
-
-Development (AI Engine)
-
-Run the AI engine:
-
-python -m ai_engine.app
-
-Development (Server)
-
-Start the server:
-
-python server/main.py
-
-
-Workflows are managed via server/workflow.py. Assets and sample outputs are in server/assets/ and server/output/.
-
-📖 File-by-File Overview
-Core Tools
-
-tools_crawl.py → Functions for crawling and scraping data.
-
-tools_search.py → Functions for querying/searching collected data.
-
-tools_summarize.py → Summarization utilities for condensing text.
-
-Entry Points
-
-app.py → Prototype entry (Naman branch).
-
-ai_engine/app.py → AI engine entry (development branch).
-
-server/main.py → Starts API/web server.
-
-Server-Side (Dev)
-
-workflow.py → Defines data pipelines and orchestration.
-
-assets/ → Includes fonts, images, glyph metadata.
-
-output/ → Stores processed/generated outputs.
-
-Config & Dependencies
-
-requirements.txt → Dependencies (both branches).
-
-pyproject.toml & uv.lock → Modern package/dependency management.
-
-.python-version → Python version lock for reproducibility.
-
-🤝 Contributing
-
-Fork the repository
-
-Create a feature branch (git checkout -b feature/new-feature)
-
-Commit your changes (git commit -m "Add feature")
-
-Push to the branch (git push origin feature/new-feature)
-
-Create a Pull Request
-
-📜 License
-
-If no license file is present, this project is currently all rights reserved.
-For open-source contributions, consider adding a license (e.g., MIT, Apache 2.0).
-
-🧭 Notes
-
-Use the Naman branch for quick prototyping.
-
-Use the Development branch for production-grade usage.
-
-Both share the same core functionality but differ in structure and tooling.
-
-Do you also want me to adapt this README so it looks like the final “canonical” version for PGAI-development only (with Naman just mentioned as a prototype), or should it always document both in parallel?
+This project is licensed under the MIT License.
