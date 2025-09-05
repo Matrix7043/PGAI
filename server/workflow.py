@@ -6,7 +6,9 @@ import os
 from typing import Tuple, Optional
 from typing_extensions import TypedDict
 from pathlib import Path
+import time
 from langgraph.graph import StateGraph, END
+import re
 
 dotenv.load_dotenv()
 
@@ -129,12 +131,16 @@ def create_workflow():
 # Example usage
 def run_workflow(content, reference, title):
     """Run the image processing workflow"""
-    # Create initial state
-    IMGPATH = os.getenv("IMGPATH", "./assets/base.png")
+    script_dir = Path(__file__).parent
+
+    # The 'assets' folder is in the same directory as this script.
+    IMGPATH = os.getenv("IMGPATH", str(script_dir / "assets" / "base.png"))
     FONTPATH = os.getenv(
-        "FONTPATH", "./assets/JetBrainsMonoNerdFontMono-BoldItalic.ttf"
+        "FONTPATH", str(script_dir / "assets" / "JetBrainsMonoNerdFontMono-BoldItalic.ttf")
     )
-    OUTPUTPATH = os.getenv("OUTPUTPATH", "./output/processed_image.png")
+    OUTPUTDIR = os.getenv("OUTPUTDIR", "./output")
+    safe_title = re.sub(r'[\\/*?:"<>|]', "", title)[:50] 
+    OUTPUTPATH = os.path.join(OUTPUTDIR, f"{int(time.time())}_{safe_title}.png")
 
     initial_state: WorkflowState = {
         "image_path": IMGPATH,

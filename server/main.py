@@ -15,7 +15,7 @@ async def validate_item(item: Item):
     if item.content.__len__() > 150:
         raise HTTPException(202, detail="content <= 150")
     if item.reference.__len__() > 30:
-        raise HTTPException(202, detail="reference <= 30")
+        raise HTTPException(202, detail="reference <= 80")
     if item.title.__len__() > 12:
         raise HTTPException(202, detail="title <= 12")
     return item
